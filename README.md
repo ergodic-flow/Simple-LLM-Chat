@@ -1,4 +1,4 @@
-# LLM Chat UI
+# Simple LLM Chat
 
 A simple multi-modal chat UI. Accepts images, audio using the microphone, and text inputs.
 Supports simple TTS via KittenTTS in browser.
