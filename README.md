@@ -13,3 +13,9 @@ Just run your server, and point the UI to the server URL. No installation, just 
 - Image inputs.
 - Draws bounding boxes for supported models such as Gemma and Qwen.
 - TTS of LLM outputs using KittenTTS. Takes a minute to download models, but then fast.
+
+![screenshot](/assets/screenshot.jpeg)
+
+## Acknowledgements
+
+- TTS powered by [KittenTTS](https://github.com/KittenML/KittenTTS)
