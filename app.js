@@ -649,6 +649,7 @@
     const body = {
       messages: buildMessages(text, images, audios),
       stream: true,
+      stream_options: { include_usage: true },
     };
     
     conversation.push({ id: "user-" + Date.now(), role: "user", content: buildContent(text, images, audios) });
@@ -681,6 +682,7 @@
       let buffer = "";
       let gotContent = false;
       let tokenCount = 0;
+      let usage = null;
       let firstTokenTime = 0;
       let lastTokenTime = 0;
 
@@ -699,6 +701,7 @@
           if (data === "[DONE]") break;
           try {
             const json = JSON.parse(data);
+            if (json.usage) usage = json.usage;
             const choice = json.choices && json.choices[0];
             const delta = choice && choice.delta;
             if (choice && choice.mask_pngs && choice.mask_pngs.length > 0) {
@@ -738,14 +741,15 @@
         }
       }
 
-      if (tokenCount > 0) {
+      var completionTokens = usage && typeof usage.completion_tokens === "number" ? usage.completion_tokens : tokenCount;
+      if (completionTokens > 0 && firstTokenTime) {
         var ttft = (firstTokenTime - requestStartTime) / 1000;
-        var genTokens = Math.max(tokenCount - 1, 0);
+        var genTokens = Math.max(completionTokens - 1, 0);
         var genElapsed = (lastTokenTime - firstTokenTime) / 1000;
         var tps = genTokens > 0 && genElapsed > 0 ? (genTokens / genElapsed).toFixed(1) : "—";
         var statsEl = document.createElement("div");
         statsEl.className = "gen-stats";
-        statsEl.textContent = "TTFT " + ttft.toFixed(2) + "s \u00b7 gen " + tps + " tok/s \u00b7 " + tokenCount + " tokens";
+        statsEl.textContent = "TTFT " + ttft.toFixed(2) + "s \u00b7 gen " + tps + " tok/s \u00b7 " + completionTokens + " tokens";
         bodyEl.parentElement.appendChild(statsEl);
       }
 
