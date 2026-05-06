@@ -666,6 +666,7 @@
       let collectedMaskPngs = [];
 
     const bodyEl = addThinking();
+    const requestStartTime = performance.now();
 
     try {
       const resp = await fetch(host + "/v1/chat/completions", {
@@ -704,6 +705,11 @@
               collectedMaskPngs = collectedMaskPngs.concat(choice.mask_pngs);
             }
             if (delta && (delta.reasoning_content || delta.reasoning)) {
+              var reasoningNow = performance.now();
+              if (!firstTokenTime) firstTokenTime = reasoningNow;
+              tokenCount++;
+              lastTokenTime = reasoningNow;
+
               var deltaReasoning = delta.reasoning_content || delta.reasoning;
               reasoningContentText += typeof deltaReasoning === "string" ? deltaReasoning : JSON.stringify(deltaReasoning);
               setReasoningText(bodyEl.parentElement, reasoningContentText + inlineReasoningText);
@@ -711,6 +717,10 @@
             }
             if (delta && delta.content) {
               var now = performance.now();
+              if (!firstTokenTime) firstTokenTime = now;
+              tokenCount++;
+              lastTokenTime = now;
+
               rawContentText += delta.content;
               var parsed = splitThinkContent(rawContentText);
               inlineReasoningText = parsed.reasoning;
@@ -719,11 +729,6 @@
               if (parsed.answer && !gotContent) {
                 gotContent = true;
                 bodyEl.classList.remove("thinking");
-                firstTokenTime = now;
-              }
-              if (parsed.answer !== responseText) {
-                tokenCount++;
-                lastTokenTime = now;
               }
               responseText = parsed.answer;
               bodyEl.textContent = responseText;
@@ -733,12 +738,14 @@
         }
       }
 
-      if (gotContent && tokenCount > 0) {
-        var elapsed = (lastTokenTime - firstTokenTime) / 1000;
-        var tps = elapsed > 0 ? (tokenCount / elapsed).toFixed(1) : "—";
+      if (tokenCount > 0) {
+        var ttft = (firstTokenTime - requestStartTime) / 1000;
+        var genTokens = Math.max(tokenCount - 1, 0);
+        var genElapsed = (lastTokenTime - firstTokenTime) / 1000;
+        var tps = genTokens > 0 && genElapsed > 0 ? (genTokens / genElapsed).toFixed(1) : "—";
         var statsEl = document.createElement("div");
         statsEl.className = "gen-stats";
-        statsEl.textContent = tokenCount + " tokens \u00b7 " + tps + " tok/s \u00b7 " + elapsed.toFixed(1) + "s";
+        statsEl.textContent = "TTFT " + ttft.toFixed(2) + "s \u00b7 gen " + tps + " tok/s \u00b7 " + tokenCount + " tokens";
         bodyEl.parentElement.appendChild(statsEl);
       }
 
