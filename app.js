@@ -158,6 +158,7 @@
     }
 
     const body = document.createElement("div");
+    body.className = "message-body";
     body.textContent = text || "";
     el.appendChild(body);
 
@@ -175,9 +176,78 @@
   function getOrCreateAssistantMessage() {
     let last = messagesEl.lastElementChild;
     if (last && last.classList.contains("assistant")) {
-      return last.querySelector("div:last-child");
+      return last.querySelector(".message-body") || last.querySelector("div:last-child");
     }
     return addMessage("assistant", "");
+  }
+
+  function partialThinkTagLength(text) {
+    var tags = ["<think>", "</think>"];
+    var max = 0;
+    tags.forEach(function (tag) {
+      for (var i = 1; i < tag.length; i++) {
+        if (text.endsWith(tag.slice(0, i))) max = Math.max(max, i);
+      }
+    });
+    return max;
+  }
+
+  function splitThinkContent(text) {
+    var partial = partialThinkTagLength(text);
+    var parseable = partial ? text.slice(0, -partial) : text;
+    var answer = "";
+    var reasoning = "";
+    var inThink = false;
+    var i = 0;
+
+    while (i < parseable.length) {
+      if (inThink) {
+        var end = parseable.indexOf("</think>", i);
+        if (end === -1) {
+          reasoning += parseable.slice(i);
+          break;
+        }
+        reasoning += parseable.slice(i, end);
+        i = end + "</think>".length;
+        inThink = false;
+      } else {
+        var start = parseable.indexOf("<think>", i);
+        if (start === -1) {
+          answer += parseable.slice(i);
+          break;
+        }
+        answer += parseable.slice(i, start);
+        i = start + "<think>".length;
+        inThink = true;
+      }
+    }
+
+    if (reasoning) answer = answer.replace(/^\s+/, "");
+    return { answer: answer, reasoning: reasoning };
+  }
+
+  function setReasoningText(msgEl, text) {
+    var clean = (text || "").trim();
+    if (!clean || !msgEl) return;
+
+    var details = msgEl.querySelector(".reasoning");
+    if (!details) {
+      details = document.createElement("details");
+      details.className = "reasoning";
+
+      var summary = document.createElement("summary");
+      summary.textContent = "Reasoning";
+      details.appendChild(summary);
+
+      var content = document.createElement("div");
+      content.className = "reasoning-content";
+      details.appendChild(content);
+
+      var body = msgEl.querySelector(".message-body");
+      msgEl.insertBefore(details, body || null);
+    }
+
+    details.querySelector(".reasoning-content").textContent = clean;
   }
 
   function renderPreviewBar() {
@@ -588,7 +658,10 @@
       body.chat_template_kwargs = { enable_thinking: true };
     }
 
+      let rawContentText = "";
       let responseText = "";
+      let inlineReasoningText = "";
+      let reasoningContentText = "";
       let aborted = false;
       let collectedMaskPngs = [];
 
@@ -630,16 +703,29 @@
             if (choice && choice.mask_pngs && choice.mask_pngs.length > 0) {
               collectedMaskPngs = collectedMaskPngs.concat(choice.mask_pngs);
             }
+            if (delta && (delta.reasoning_content || delta.reasoning)) {
+              var deltaReasoning = delta.reasoning_content || delta.reasoning;
+              reasoningContentText += typeof deltaReasoning === "string" ? deltaReasoning : JSON.stringify(deltaReasoning);
+              setReasoningText(bodyEl.parentElement, reasoningContentText + inlineReasoningText);
+              scrollToBottom();
+            }
             if (delta && delta.content) {
               var now = performance.now();
-              if (!gotContent) {
+              rawContentText += delta.content;
+              var parsed = splitThinkContent(rawContentText);
+              inlineReasoningText = parsed.reasoning;
+              setReasoningText(bodyEl.parentElement, reasoningContentText + inlineReasoningText);
+
+              if (parsed.answer && !gotContent) {
                 gotContent = true;
                 bodyEl.classList.remove("thinking");
                 firstTokenTime = now;
               }
-              tokenCount++;
-              lastTokenTime = now;
-              responseText += delta.content;
+              if (parsed.answer !== responseText) {
+                tokenCount++;
+                lastTokenTime = now;
+              }
+              responseText = parsed.answer;
               bodyEl.textContent = responseText;
               scrollToBottom();
             }

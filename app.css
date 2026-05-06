@@ -348,6 +348,24 @@ html, body {
   margin-bottom: 6px;
 }
 
+.message .reasoning {
+  margin-bottom: 8px;
+  color: var(--text-dim);
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+
+.message .reasoning summary {
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+
+.message .reasoning-content {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
 .message .thinking::after {
   content: "● ● ●";
   display: inline-block;
